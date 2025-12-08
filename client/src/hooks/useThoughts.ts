@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { thoughtService, type Thought } from '../services/thoughtService';
 
 export const useThoughts = () => {
@@ -6,46 +6,44 @@ export const useThoughts = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchThoughts = async () => {
+    // useCallback ensures this function reference is stable
+    const fetchThoughts = useCallback(async () => {
         setLoading(true);
         try {
             const data = await thoughtService.getAll();
             setThoughts(data);
             setError(null);
+            return true; // Indicate Success
         } catch (err) {
             setError('Could not load thoughts. Is the backend running?');
+            return false; // Indicate Failure
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const addThought = async (content: string) => {
+    const addThought = async (content: string, tag: string) => {
         try {
-            const newThought = await thoughtService.create(content);
-            setThoughts(prev => [...prev, newThought]);
+            const newThought = await thoughtService.create(content, tag);
+            setThoughts(prev => [newThought, ...prev]); 
             return true;
         } catch (err) {
-            alert("Failed to save thought");
             return false;
         }
     };
 
     const removeThought = async (id: number) => {
-        // Optimistic update: Remove immediately from UI
+        const originalThoughts = [...thoughts];
         setThoughts(prev => prev.filter(t => t.id !== id));
+        
         try {
             await thoughtService.delete(id);
+            return true;
         } catch (err) {
-            // Revert if failed
-            alert("Failed to delete");
-            fetchThoughts(); 
+            setThoughts(originalThoughts);
+            return false;
         }
     };
-
-    // Load initial data
-    useEffect(() => {
-        fetchThoughts();
-    }, []);
 
     return { thoughts, loading, error, addThought, removeThought, refresh: fetchThoughts };
 };

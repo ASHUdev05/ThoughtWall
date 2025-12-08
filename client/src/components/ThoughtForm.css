@@ -1,42 +1,84 @@
 .thought-form {
-    background: var(--card-bg);
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    display: flex;
-    gap: 10px;
-    border: 1px solid var(--border-color);
-    margin-bottom: 2rem;
-}
+        background: var(--card-bg);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column; /* Changed to column to stack input and controls */
+        gap: 1rem;
+        border: 1px solid var(--border-color);
+        margin-bottom: 2rem;
+    }
 
-.thought-input {
-    flex: 1;
-    padding: 12px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--bg-color);
-    color: var(--text-color);
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s;
-}
+    .input-group {
+        width: 100%;
+    }
 
-.thought-input:focus {
-    border-color: var(--secondary-color);
-}
+    .thought-input {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-color);
+        color: var(--text-color);
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.2s;
+        box-sizing: border-box; /* Ensures padding doesn't overflow width */
+    }
 
-.submit-btn {
-    background: var(--secondary-color);
-    color: #4a4a4a; /* Contrast for readability */
-    padding: 0 24px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1rem;
-    border: none;
-    cursor: pointer;
-    transition: filter 0.2s;
-}
+    .thought-input:focus {
+        border-color: var(--secondary-color);
+    }
 
-.submit-btn:hover {
-    filter: brightness(0.95);
-}
+    .controls-group {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .tag-selector {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .tag-btn {
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .tag-btn:hover {
+        background: var(--border-color);
+    }
+
+    .tag-btn.active {
+        background: var(--secondary-color);
+        color: #3e5e54;
+        border-color: var(--secondary-color);
+        font-weight: 600;
+    }
+
+    .submit-btn {
+        background: var(--secondary-color);
+        color: #3e5e54;
+        padding: 8px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 1rem;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: filter 0.2s;
+    }
+
+    .submit-btn:hover {
+        filter: brightness(0.95);
+    }
