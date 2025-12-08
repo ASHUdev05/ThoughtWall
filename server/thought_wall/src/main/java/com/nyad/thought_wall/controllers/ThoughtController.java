@@ -3,10 +3,11 @@ package com.nyad.thought_wall.controllers;
 import com.nyad.thought_wall.entity.Thought;
 import com.nyad.thought_wall.repository.ThoughtRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/thoughts")
@@ -17,9 +18,19 @@ public class ThoughtController {
     private ThoughtRepository repository;
 
     @GetMapping
-    public List<Thought> getAllThoughts() {
-        // Fix: Sort by 'createdAt' descending (newest first)
-        return repository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+    public Page<Thought> getAllThoughts(
+            @RequestParam(required = false) String tag,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size
+    ) {
+        // Sort: Pinned (True first), then CreatedAt (Newest first)
+        Sort sort = Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("createdAt"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        if (tag != null && !tag.equals("All") && !tag.isEmpty()) {
+            return repository.findByTag(tag, pageable);
+        }
+        return repository.findAll(pageable);
     }
 
     @PostMapping
@@ -27,8 +38,23 @@ public class ThoughtController {
         return repository.save(thought);
     }
 
+    @PutMapping("/{id}")
+    public Thought updateThought(@PathVariable Long id, @RequestBody Thought updatedThought) {
+        return repository.findById(id).map(thought -> {
+            thought.setContent(updatedThought.getContent());
+            thought.setTag(updatedThought.getTag());
+            thought.setPinned(updatedThought.isPinned()); // Update pin status
+            return repository.save(thought);
+        }).orElseThrow(() -> new RuntimeException("Thought not found with id " + id));
+    }
+
     @DeleteMapping("/{id}")
     public void deleteThought(@PathVariable Long id) {
         repository.deleteById(id);
+    }
+    
+    @PutMapping("/tags/migrate")
+    public void migrateTag(@RequestParam String oldTag, @RequestParam String newTag) {
+        repository.updateTagForThoughts(oldTag, newTag);
     }
 }

@@ -15,6 +15,9 @@ public class Thought {
     private String content;
 
     private String tag;
+    
+    // New Pinned Field
+    private boolean pinned;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -24,9 +27,9 @@ public class Thought {
     public Thought(String content, String tag) {
         this.content = content;
         this.tag = tag;
+        this.pinned = false;
     }
 
-    // Auto-set the date before inserting
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -41,6 +44,9 @@ public class Thought {
 
     public String getTag() { return tag; }
     public void setTag(String tag) { this.tag = tag; }
+    
+    public boolean isPinned() { return pinned; }
+    public void setPinned(boolean pinned) { this.pinned = pinned; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
