@@ -1,0 +1,42 @@
+.thought-form {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+}
+
+.thought-input {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.thought-input:focus {
+    border-color: var(--secondary-color);
+}
+
+.submit-btn {
+    background: var(--secondary-color);
+    color: #4a4a4a; /* Contrast for readability */
+    padding: 0 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    border: none;
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+
+.submit-btn:hover {
+    filter: brightness(0.95);
+}

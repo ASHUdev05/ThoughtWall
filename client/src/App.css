@@ -1,0 +1,61 @@
+/* --- PASTEL THEME VARIABLES --- */
+:root {
+  /* Light Mode Pastels */
+  --bg-color: #fdfbf7;        /* Creamy White */
+  --text-color: #4a4a4a;      /* Soft Charcoal */
+  --card-bg: #ffffff;
+  --primary-color: #ffb7b2;    /* Pastel Red/Pink */
+  --secondary-color: #b5ead7;  /* Pastel Mint */
+  --accent-color: #8f83bb;     /* Pastel Periwinkle */
+  --border-color: #e0e0e0;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Dark Mode Pastels */
+body.dark-mode, .dark {
+  --bg-color: #2b2b36;         /* Soft Dark Slate */
+  --text-color: #e0e0e0;       /* Soft White */
+  --card-bg: #3a3a46;          /* Lighter Slate */
+  --primary-color: #ff9aa2;    /* Salmon Pink */
+  --secondary-color: #8ac6d1;  /* Muted Teal */
+  --accent-color: #266634;     /* Muted Purple (Green hex preserved) */
+  --border-color: #444455;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* --- GLOBAL RESETS --- */
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+h1 {
+  font-weight: 700;
+  color: var(--primary-color);
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: transform 0.1s ease, opacity 0.2s;
+}
+
+button:active {
+  transform: scale(0.98);
+}
