@@ -1,66 +1,109 @@
-/* --- PASTEL THEME VARIABLES --- */
+/* --- GLOBAL RESETS & SCROLLBAR FIX --- */
 :root {
+  /* Keep your existing variable definitions here */
   /* Light Mode Pastels */
-  --bg-color: #fdfbf7;        /* Creamy White */
-  --text-color: #4a4a4a;      /* Soft Charcoal */
+  --bg-color: #fdfbf7;
+  --text-color: #4a4a4a;
   --card-bg: #ffffff;
-  --primary-color: #ffb7b2;    /* Pastel Red/Pink */
-  --secondary-color: #b5ead7;  /* Pastel Mint */
-  --accent-color: #8f83bb;     /* Pastel Periwinkle */
+  --primary-color: #ffb7b2;
+  --secondary-color: #b5ead7;
+  --accent-color: #8f83bb;
   --border-color: #e0e0e0;
   --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-sizing: border-box; /* Fix calculation of widths */
 }
 
 /* Dark Mode Pastels */
 body.dark-mode, .dark {
-  --bg-color: #2b2b36;         /* Soft Dark Slate */
-  --text-color: #e0e0e0;       /* Soft White */
-  --card-bg: #3a3a46;          /* Lighter Slate */
-  --primary-color: #ff9aa2;    /* Salmon Pink */
-  --secondary-color: #8ac6d1;  /* Muted Teal */
-  --accent-color: #266634;     /* Muted Purple (Green hex preserved) */
+  --bg-color: #2b2b36;
+  --text-color: #e0e0e0;
+  --card-bg: #3a3a46;
+  --primary-color: #ff9aa2;
+  --secondary-color: #8ac6d1;
+  --accent-color: #266634;
   --border-color: #444455;
   --shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* --- GLOBAL RESETS --- */
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
 body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-container {
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
   padding: 2rem;
+  flex: 1; /* Allows container to take height without forcing scroll */
   display: flex;
   flex-direction: column;
-  gap: 2rem;
 }
 
+/* --- HEADER & ICON FIXES --- */
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-top: 1rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.8rem; /* Space between buttons */
+    align-items: center;
+}
+
+/* Unified Icon Button Style (Applies to Profile, Logout, AND Theme Toggle) */
+.icon-btn, .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-color);
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
+    padding: 0; /* Remove default padding */
+    line-height: 1;
+}
+
+.icon-btn:hover, .theme-toggle-btn:hover {
+    transform: translateY(-2px);
+    background-color: var(--border-color);
+    filter: brightness(0.95);
+}
+
+/* Typography */
 h1 {
   font-weight: 700;
   color: var(--primary-color);
-  text-align: center;
-  margin-bottom: 1rem;
+  margin: 0;
 }
 
-button {
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-  transition: transform 0.1s ease, opacity 0.2s;
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
-/* --- FILTER BAR STYLES --- */
+/* Re-add your filter/button styles below if they were missing */
 .filter-bar {
   display: flex;
   align-items: center;

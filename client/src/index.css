@@ -1,0 +1,35 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+}
+
+#root {
+  /* Use Grid or Flex to center content perfectly */
+  display: flex;
+  justify-content: center;
+  align-items: center; 
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Ensure the app container doesn't force overflow */
+.app-container {
+  width: 100%;
+  max-width: 800px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  /* Allow it to shrink if needed, but grow to max-width */
+  flex: 0 1 auto; 
+}

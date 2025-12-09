@@ -1,71 +1,120 @@
 .thought-list {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
 
-    .thought-card {
-        background: var(--card-bg);
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        border: 1px solid var(--border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start; /* Aligns delete button to top */
-        animation: fadeIn 0.4s ease-in;
-    }
+.thought-card {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    animation: fadeIn 0.4s ease-in;
+    position: relative;
+    overflow: hidden; /* Keeps the pinned border neat */
+}
 
-    .thought-main {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
+.thought-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1; /* Takes remaining space */
+    min-width: 0; /* Prevents text overflow issues */
+}
 
-    .thought-tag {
-        display: inline-block;
-        align-self: flex-start;
-        background: var(--secondary-color);
-        color: #3e5e54;
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 2px 8px;
-        border-radius: 4px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
+.thought-tag {
+    display: inline-block;
+    background: var(--secondary-color);
+    color: #3e5e54;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
-    .thought-content {
-        font-size: 1.1rem;
-        line-height: 1.5;
-        margin: 0;
-        color: var(--text-color);
-        white-space: pre-wrap; /* Preserves newlines */
-    }
+.thought-content {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    margin: 0;
+    color: var(--text-color);
+    white-space: pre-wrap; /* Preserves newlines */
+    word-break: break-word;
+    transition: color 0.2s ease;
+}
 
-    .delete-btn {
-        background: transparent;
-        color: var(--primary-color);
-        font-size: 1.5rem;
-        padding: 0 8px; /* Adjusted padding */
-        border-radius: 50%;
-        border: none;
-        cursor: pointer;
-        line-height: 1;
-        margin-left: 1rem; /* Space between content and X */
-    }
+.thought-date {
+    font-size: 0.8rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    margin-top: 0.2rem;
+}
 
-    .delete-btn:hover {
-        background: rgba(0,0,0,0.05);
-    }
+/* --- Action Buttons Container --- */
+.thought-actions {
+    display: flex;
+    gap: 4px;
+    align-items: flex-start;
+    margin-left: 1rem;
+    flex-shrink: 0; /* Prevents buttons from squishing */
+}
 
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+/* --- Shared Action Button Style --- */
+.action-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 1.2rem;
+    transition: background-color 0.2s, transform 0.1s;
+    color: var(--text-color);
+    opacity: 0.6;
+}
 
-    .loading-spinner {
-        text-align: center;
-        color: var(--accent-color);
-        padding: 2rem;
-    }
+.action-btn:hover {
+    background-color: rgba(0,0,0,0.05);
+    opacity: 1;
+}
+
+.action-btn:active {
+    transform: scale(0.9);
+}
+
+/* Specific colors for specific actions */
+.pin-btn {
+    font-size: 1.1rem;
+}
+
+.edit-btn {
+    font-size: 1.1rem;
+}
+
+.delete-btn {
+    color: var(--primary-color);
+    opacity: 0.7;
+    font-size: 1.4rem; /* Slightly larger X */
+}
+
+.delete-btn:hover {
+    background-color: rgba(255, 0, 0, 0.05);
+    opacity: 1;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.loading-spinner {
+    text-align: center;
+    color: var(--accent-color);
+    padding: 2rem;
+    font-weight: 500;
+}

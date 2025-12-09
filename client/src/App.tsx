@@ -3,221 +3,176 @@ import './App.css';
 import ThemeToggle from './components/ThemeWidget';
 import ThoughtForm from './components/ThoughtForm';
 import ThoughtList from './components/ThoughtList';
-import Toast from './components/Toast'; 
+import Toast from './components/Toast';
+import AuthForm from './components/AuthForm';
+import RoomManager from './components/RoomManager';
+import UserProfileView from './components/UserProfile'; // Import Profile
 import { useThoughts } from './hooks/useThoughts';
-import { thoughtService } from './services/thoughtService';
+import { thoughtService, roomService, type User } from './services/thoughtService';
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  
-  // Toast State
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
-  // Search State
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Tag Management State
-  const defaultTags = ["General", "Idea", "To-Do", "Journal", "Dream"];
-  const [customTags, setCustomTags] = useState<string[]>([]);
-  
-  // Combine defaults with user-created tags
-  const availableTags = [...defaultTags, ...customTags];
-
-  // Hook handles Server-side Pagination & Filtering
-  const { 
-      thoughts, 
-      loading, 
-      addThought, 
-      editThought,
-      togglePin,
-      removeThought, 
-      page, 
-      setPage, 
-      totalPages,
-      setFilter,
-      refresh 
-  } = useThoughts("All");
-
-  const [activeFilter, setActiveFilter] = useState("All");
-
-  // Handle Theme Logic
   useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
+    if (isDarkMode) document.body.classList.add('dark-mode');
+    else document.body.classList.remove('dark-mode');
   }, [isDarkMode]);
 
-  const showToast = (msg: string, type: 'success' | 'error') => {
-    setToast({ msg, type });
+  const showToast = (msg: string, type: 'success' | 'error') => setToast({ msg, type });
+
+  const handleLogin = (newToken: string) => {
+    setToken(newToken);
+    showToast("Welcome back!", "success");
   };
 
-  // --- Handlers ---
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    showToast("Logged out.", "success");
+  };
+
+  if (!token) {
+    return (
+      <div className="app-container">
+         <ThemeToggle isDark={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} />
+         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+            <h1>The Thought Wall</h1>
+         </div>
+         {toast && <div className="toast-container"><Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} /></div>}
+         <AuthForm onLogin={handleLogin} />
+      </div>
+    );
+  }
+
+  return <AuthenticatedApp 
+            isDarkMode={isDarkMode} 
+            setIsDarkMode={setIsDarkMode} 
+            handleLogout={handleLogout}
+            showToast={showToast}
+            toast={toast}
+            setToast={setToast}
+         />;
+}
+
+function AuthenticatedApp({ isDarkMode, setIsDarkMode, handleLogout, showToast, toast, setToast }: any) {
+  const [activeRoomId, setActiveRoomId] = useState<number | undefined>(undefined);
+  const [roomMembers, setRoomMembers] = useState<User[]>([]);
+  const [showProfile, setShowProfile] = useState(false); // Profile View State
+
+  const defaultTags = ["General", "Idea", "To-Do", "Journal", "Dream"];
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const availableTags = [...defaultTags, ...customTags];
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { 
+      thoughts, loading, addThought, editThought, togglePin, removeThought, toggleComplete, assignUser,
+      page, setPage, totalPages, setFilter, refresh 
+  } = useThoughts("All", activeRoomId);
+
+  useEffect(() => {
+    if(activeRoomId) {
+        roomService.getMembers(activeRoomId).then(setRoomMembers).catch(console.error);
+    } else {
+        setRoomMembers([]);
+    }
+    setActiveFilter("All");
+    setFilter("All");
+  }, [activeRoomId, setFilter]);
 
   const handleAddThought = async (content: string, tag: string) => {
-    // If it's a new custom tag, add it to our local list
-    if (tag && !availableTags.includes(tag)) {
-        setCustomTags(prev => [...prev, tag]);
-    }
-
+    if (tag && !availableTags.includes(tag)) setCustomTags(prev => [...prev, tag]);
     const success = await addThought(content, tag);
-    if (success) {
-        showToast("Thought captured!", "success");
-        return true;
-    } else {
-        showToast("Failed to save. Is backend running?", "error");
-        return false;
-    }
+    if (success) showToast("Thought captured!", "success");
+    return success;
   };
 
   const handleEditThought = async (id: number, content: string, tag: string) => {
-      // Also capture new tags during edit
-      if (tag && !availableTags.includes(tag)) {
-          setCustomTags(prev => [...prev, tag]);
-      }
-
+      if (tag && !availableTags.includes(tag)) setCustomTags(prev => [...prev, tag]);
       const success = await editThought(id, content, tag);
       if (success) showToast("Thought updated!", "success");
-      else showToast("Failed to update.", "error");
       return success;
   };
 
-  const handleDeleteThought = async (id: number) => {
-    const success = await removeThought(id);
-    if (success) showToast("Thought removed.", "success");
-    else showToast("Could not delete.", "error");
-  };
-
   const handleDeleteTag = async (tagToDelete: string) => {
-      // 1. Remove from UI list immediately
       setCustomTags(prev => prev.filter(t => t !== tagToDelete));
-      
-      // 2. If the user is currently filtering by this tag, reset to All
-      if (activeFilter === tagToDelete) {
-          setActiveFilter("All");
-          setFilter("All");
-          setPage(0);
-      }
-
-      // 3. Backend: Migrate all thoughts with this tag to 'General'
+      if (activeFilter === tagToDelete) { setActiveFilter("All"); setFilter("All"); setPage(0); }
       try {
           await thoughtService.migrateTag(tagToDelete, "General");
-          refresh(); // Re-fetch data to show updated tags
-          showToast(`Deleted tag "${tagToDelete}". Entries moved to General.`, "success");
-      } catch (error) {
-          showToast("Failed to migrate old entries.", "error");
-      }
+          refresh();
+          showToast("Tag deleted.", "success");
+      } catch (error) { showToast("Failed.", "error"); }
   };
 
-  const handleFilterChange = (newTag: string) => {
-      setActiveFilter(newTag);
-      setFilter(newTag); // Triggers API call in hook
-      setPage(0); // Reset to first page
-  };
-
-  // Client-side search filtering on the current page of thoughts
-  const displayedThoughts = thoughts.filter(t => 
-      t.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const displayedThoughts = thoughts.filter(t => t.content.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="app-container">
-      <ThemeToggle 
-        isDark={isDarkMode} 
-        toggleTheme={() => setIsDarkMode(!isDarkMode)} 
-      />
-      
-      <div>
-        <h1>The Thought Wall</h1>
-        <p style={{textAlign: 'center', opacity: 0.7}}>
-            Powered by Spring Boot & React
-        </p>
-      </div>
+        {/* Header with Theme, Profile, and Logout */}
+        <div className="header-container">
+            <h1 style={{margin:0, fontSize: '1.8rem'}}>The Thought Wall</h1>
+            <div className="header-actions">
+                <ThemeToggle isDark={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} />
+                <button className="icon-btn" onClick={() => setShowProfile(true)} title="My Profile">👤</button>
+                <button className="icon-btn" onClick={handleLogout} title="Logout">🚪</button>
+            </div>
+        </div>
 
-      {/* Toast Notification Container */}
-      {toast && (
-        <div className="toast-container">
-            <Toast 
-                message={toast.msg} 
-                type={toast.type} 
-                onClose={() => setToast(null)} 
+        {toast && (
+            <div className="toast-container">
+                <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+            </div>
+        )}
+
+        {/* Conditional Rendering: Profile OR Main Board */}
+        {showProfile ? (
+            <UserProfileView 
+                onClose={() => setShowProfile(false)} 
+                onLogout={handleLogout}
+                onNavigateToRoom={(id) => { setActiveRoomId(id); setShowProfile(false); }}
             />
-        </div>
-      )}
+        ) : (
+            <>
+                <RoomManager activeRoomId={activeRoomId} onRoomSelect={setActiveRoomId} />
 
-      <ThoughtForm 
-        onAdd={handleAddThought} 
-        availableTags={availableTags} 
-        defaultTags={defaultTags}
-        onDeleteTag={handleDeleteTag}
-      />
+                <ThoughtForm onAdd={handleAddThought} availableTags={availableTags} defaultTags={defaultTags} onDeleteTag={handleDeleteTag} />
 
-      {/* Search Input */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <input 
-            type="text" 
-            placeholder="🔍 Search thoughts on this page..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="thought-input" // Reusing our nice input style
-        />
-      </div>
+                <div style={{ marginBottom: '1rem' }}>
+                    <input type="text" placeholder="🔍 Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="thought-input" />
+                </div>
 
-      {/* Filter Bar */}
-      <div className="filter-bar">
-        <span style={{fontSize: '0.9rem', fontWeight: 600, opacity: 0.7}}>Filter by:</span>
-        <div className="filter-options">
-            <button
-                onClick={() => handleFilterChange("All")}
-                className={`filter-chip ${activeFilter === "All" ? 'active' : ''}`}
-            >
-                All
-            </button>
-            {availableTags.map(t => (
-                <button
-                    key={t}
-                    onClick={() => handleFilterChange(t)}
-                    className={`filter-chip ${activeFilter === t ? 'active' : ''}`}
-                >
-                    {t}
-                </button>
-            ))}
-        </div>
-      </div>
-      
-      <ThoughtList 
-        thoughts={displayedThoughts} 
-        loading={loading} 
-        onDelete={handleDeleteThought} 
-        onEdit={handleEditThought}
-        onPin={togglePin}
-      />
+                <div className="filter-bar">
+                    <div className="filter-options">
+                        <button onClick={() => {setActiveFilter("All"); setFilter("All"); setPage(0);}} className={`filter-chip ${activeFilter === "All" ? 'active' : ''}`}>All</button>
+                        {availableTags.map(t => (
+                            <button key={t} onClick={() => {setActiveFilter(t); setFilter(t); setPage(0);}} className={`filter-chip ${activeFilter === t ? 'active' : ''}`}>{t}</button>
+                        ))}
+                    </div>
+                </div>
+                
+                <ThoughtList 
+                    thoughts={displayedThoughts} 
+                    loading={loading} 
+                    onDelete={async (id) => { if(await removeThought(id)) showToast("Deleted", "success"); }} 
+                    onEdit={handleEditThought}
+                    onPin={togglePin}
+                    onToggleComplete={toggleComplete}
+                    onAssign={assignUser}
+                    roomMembers={activeRoomId ? roomMembers : undefined}
+                />
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-          <div style={{display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem'}}>
-              <button 
-                className="tag-btn" 
-                disabled={page === 0}
-                onClick={() => setPage(p => p - 1)}
-              >
-                  Previous
-              </button>
-              <span style={{alignSelf: 'center', fontSize: '0.9rem', opacity: 0.8}}>
-                  Page {page + 1} of {totalPages}
-              </span>
-              <button 
-                className="tag-btn" 
-                disabled={page + 1 >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                  Next
-              </button>
-          </div>
-      )}
+                {totalPages > 1 && (
+                    <div style={{display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem'}}>
+                        <button className="tag-btn" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button>
+                        <span>{page + 1} / {totalPages}</span>
+                        <button className="tag-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+                    </div>
+                )}
+            </>
+        )}
     </div>
   );
 }
-
 export default App;

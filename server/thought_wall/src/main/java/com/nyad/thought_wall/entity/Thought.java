@@ -2,6 +2,7 @@ package com.nyad.thought_wall.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "thoughts")
@@ -15,39 +16,48 @@ public class Thought {
     private String content;
 
     private String tag;
-    
-    // New Pinned Field
     private boolean pinned;
+    private boolean completed; // New field
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    public Thought() {}
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore // Owner of the thought
+    private User user;
 
-    public Thought(String content, String tag) {
-        this.content = content;
-        this.tag = tag;
-        this.pinned = false;
-    }
+    @ManyToOne
+    @JoinColumn(name = "room_id")
+    private Room room; // Null if personal
+
+    @ManyToOne
+    @JoinColumn(name = "assigned_to")
+    private User assignedTo; // For tasks
+
+    public Thought() {}
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
 
-    // --- Getters and Setters ---
+    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-
     public String getTag() { return tag; }
     public void setTag(String tag) { this.tag = tag; }
-    
     public boolean isPinned() { return pinned; }
     public void setPinned(boolean pinned) { this.pinned = pinned; }
-
+    public boolean isCompleted() { return completed; }
+    public void setCompleted(boolean completed) { this.completed = completed; }
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    public Room getRoom() { return room; }
+    public void setRoom(Room room) { this.room = room; }
+    public User getAssignedTo() { return assignedTo; }
+    public void setAssignedTo(User assignedTo) { this.assignedTo = assignedTo; }
 }

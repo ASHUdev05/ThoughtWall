@@ -8,18 +8,10 @@ interface ThemeToggleProps {
 const ThemeToggle: React.FC<ThemeToggleProps> = ({ isDark, toggleTheme }) => {
     return (
         <button 
+            className="theme-toggle-btn"
             onClick={toggleTheme}
-            style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: 'var(--accent-color)',
-                color: '#fff',
-                padding: '10px 15px',
-                borderRadius: '20px',
-                fontWeight: 'bold',
-                boxShadow: 'var(--shadow)'
-            }}
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            // Remove inline styles to let CSS class handle it
         >
             {isDark ? '☀️' : '🌙'}
         </button>

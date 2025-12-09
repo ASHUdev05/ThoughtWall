@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Thought } from '../services/thoughtService';
+import type { Thought, User } from '../services/thoughtService';
 import './ThoughtList.css';
 
 interface Props {
@@ -8,31 +8,34 @@ interface Props {
     onDelete: (id: number) => void;
     onEdit: (id: number, content: string, tag: string) => Promise<boolean>;
     onPin: (id: number) => void;
+    onToggleComplete: (id: number) => void;
+    onAssign: (id: number, user: User | null) => void;
+    roomMembers?: User[]; // Optional: Only present if we are in a room
 }
 
-const ThoughtList: React.FC<Props> = ({ thoughts, loading, onDelete, onEdit, onPin }) => {
-    // Edit State
+const ThoughtList: React.FC<Props> = ({ 
+    thoughts, 
+    loading, 
+    onDelete, 
+    onEdit, 
+    onPin, 
+    onToggleComplete, 
+    onAssign, 
+    roomMembers 
+}) => {
+    // --- Edit State ---
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editContent, setEditContent] = useState("");
     const [editTag, setEditTag] = useState("");
 
-    // Initialize edit mode with current values
     const startEditing = (thought: Thought) => {
         setEditingId(thought.id);
         setEditContent(thought.content);
         setEditTag(thought.tag || "General");
     };
 
-    const cancelEditing = () => {
-        setEditingId(null);
-        setEditContent("");
-        setEditTag("");
-    };
-
     const saveEdit = async (id: number) => {
-        // Prevent saving empty content
         if (!editContent.trim()) return;
-        
         const success = await onEdit(id, editContent, editTag);
         if (success) {
             setEditingId(null);
@@ -53,8 +56,11 @@ const ThoughtList: React.FC<Props> = ({ thoughts, loading, onDelete, onEdit, onP
                 <div 
                     key={thought.id} 
                     className="thought-card" 
-                    // Visual cue for pinned items
-                    style={thought.pinned ? { borderLeft: '4px solid var(--accent-color)' } : {}}
+                    style={{ 
+                        borderLeft: thought.pinned ? '4px solid var(--accent-color)' : undefined,
+                        opacity: thought.completed ? 0.6 : 1,
+                        transition: 'all 0.2s ease'
+                    }}
                 >
                     {editingId === thought.id ? (
                         /* --- EDIT MODE --- */
@@ -75,27 +81,83 @@ const ThoughtList: React.FC<Props> = ({ thoughts, loading, onDelete, onEdit, onP
                             />
                             <div style={{ marginTop: '0.8rem', display: 'flex', gap: '0.5rem' }}>
                                 <button className="tag-btn active" onClick={() => saveEdit(thought.id)}>Save</button>
-                                <button className="tag-btn" onClick={cancelEditing}>Cancel</button>
+                                <button className="tag-btn" onClick={() => setEditingId(null)}>Cancel</button>
                             </div>
                         </div>
                     ) : (
                         /* --- VIEW MODE --- */
                         <>
+                            {/* Checkbox Column */}
+                            <div style={{display:'flex', flexDirection:'column', alignItems:'center', marginRight: '1rem', paddingTop:'4px'}}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={thought.completed} 
+                                    onChange={() => onToggleComplete(thought.id)}
+                                    title="Mark as done"
+                                    style={{
+                                        width: '20px', 
+                                        height: '20px', 
+                                        cursor:'pointer', 
+                                        accentColor: 'var(--accent-color)'
+                                    }}
+                                />
+                            </div>
+
+                            {/* Content Column */}
                             <div className="thought-main">
-                                <div style={{display:'flex', alignItems:'center', gap: '8px', marginBottom: '8px'}}>
+                                <div style={{display:'flex', alignItems:'center', gap: '8px', marginBottom: '8px', flexWrap:'wrap'}}>
                                     <span className="thought-tag">{thought.tag || 'General'}</span>
                                     {thought.pinned && <span title="Pinned" style={{fontSize: '0.9rem'}}>📌</span>}
+                                    
+                                    {/* Assignment Dropdown (Only if in a Room) */}
+                                    {roomMembers && (
+                                        <select 
+                                            style={{
+                                                padding: '2px 8px', 
+                                                borderRadius:'12px', 
+                                                border:'1px solid var(--border-color)', 
+                                                fontSize: '0.8rem', 
+                                                background: 'var(--bg-color)', 
+                                                color: 'var(--text-color)',
+                                                cursor: 'pointer'
+                                            }}
+                                            value={thought.assignedTo?.id || ""}
+                                            onChange={(e) => {
+                                                const uid = Number(e.target.value);
+                                                const u = roomMembers.find(m => m.id === uid) || null;
+                                                onAssign(thought.id, u);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {roomMembers.map(m => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.email}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
                                 
-                                <p className="thought-content">{thought.content}</p>
+                                <p 
+                                    className="thought-content" 
+                                    style={{
+                                        textDecoration: thought.completed ? 'line-through' : 'none',
+                                        color: thought.completed ? 'var(--text-color-muted)' : 'var(--text-color)'
+                                    }}
+                                >
+                                    {thought.content}
+                                </p>
                                 
+                                {/* Updated Date & Time Display */}
                                 <small className="thought-date">
                                     {thought.createdAt 
-                                        ? new Date(thought.createdAt).toLocaleDateString() + ' • ' + new Date(thought.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                        ? new Date(thought.createdAt).toLocaleDateString() + ' • ' + new Date(thought.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                                         : ''}
                                 </small>
                             </div>
 
+                            {/* Actions Column */}
                             <div className="thought-actions" style={{display:'flex', gap: '4px', alignItems: 'flex-start'}}>
                                 <button 
                                     className="action-btn pin-btn"
