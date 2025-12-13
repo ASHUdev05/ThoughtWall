@@ -9,7 +9,7 @@ export interface Room {
   id: number;
   name: string;
   code: string;
-  owner?: User; // Optional populated field
+  owner?: User;
 }
 
 export interface Thought {
@@ -17,6 +17,7 @@ export interface Thought {
   content: string;
   tag?: string;
   createdAt?: string;
+  dueDate?: string; // New Field
   pinned: boolean;
   completed: boolean;
   assignedTo?: User | null;
@@ -46,7 +47,7 @@ export const thoughtService = {
     tag: string = "All",
     roomId?: number,
   ): Promise<PageResponse<Thought>> => {
-    const params = new URLSearchParams({ page: page.toString(), size: "5" });
+    const params = new URLSearchParams({ page: page.toString(), size: "20" }); // Increased size
     if (tag && tag !== "All") params.append("tag", tag);
     if (roomId) params.append("roomId", roomId.toString());
 
@@ -61,11 +62,12 @@ export const thoughtService = {
     content: string,
     tag: string,
     roomId?: number,
+    dueDate?: string,
   ): Promise<Thought> => {
     const response = await fetch(`${API_BASE}/thoughts`, {
       method: "POST",
       headers: getHeaders(),
-      body: JSON.stringify({ content, tag, roomId }),
+      body: JSON.stringify({ content, tag, roomId, dueDate }),
     });
     if (!response.ok) throw new Error("Failed to create thought");
     return response.json();
@@ -96,10 +98,7 @@ export const thoughtService = {
     const params = new URLSearchParams({ oldTag, newTag });
     const response = await fetch(
       `${API_BASE}/thoughts/tags/migrate?${params.toString()}`,
-      {
-        method: "PUT",
-        headers: getHeaders(),
-      },
+      { method: "PUT", headers: getHeaders() },
     );
     if (!response.ok) throw new Error("Failed to migrate tags");
   },
@@ -134,7 +133,6 @@ export const roomService = {
     });
     return response.json();
   },
-  // NEW: Delete Room
   deleteRoom: async (id: number): Promise<void> => {
     const response = await fetch(`${API_BASE}/rooms/${id}`, {
       method: "DELETE",

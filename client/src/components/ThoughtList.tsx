@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import type { Thought, User } from "../services/thoughtService";
 import "./ThoughtList.css";
 
@@ -10,7 +11,7 @@ interface Props {
   onPin: (id: number) => void;
   onToggleComplete: (id: number) => void;
   onAssign: (id: number, user: User | null) => void;
-  roomMembers?: User[]; // Optional: Only present if we are in a room
+  roomMembers?: User[];
 }
 
 const ThoughtList: React.FC<Props> = ({
@@ -23,7 +24,6 @@ const ThoughtList: React.FC<Props> = ({
   onAssign,
   roomMembers,
 }) => {
-  // --- Edit State ---
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editTag, setEditTag] = useState("");
@@ -40,6 +40,11 @@ const ThoughtList: React.FC<Props> = ({
     if (success) {
       setEditingId(null);
     }
+  };
+
+  const isOverdue = (dueDate?: string, completed?: boolean) => {
+    if (!dueDate || completed) return false;
+    return new Date(dueDate) < new Date();
   };
 
   if (loading && thoughts.length === 0) {
@@ -64,6 +69,9 @@ const ThoughtList: React.FC<Props> = ({
             borderLeft: thought.pinned
               ? "4px solid var(--accent-color)"
               : undefined,
+            borderRight: isOverdue(thought.dueDate, thought.completed)
+              ? "4px solid #e74c3c"
+              : undefined,
             opacity: thought.completed ? 0.6 : 1,
             transition: "all 0.2s ease",
           }}
@@ -75,18 +83,14 @@ const ThoughtList: React.FC<Props> = ({
                 value={editTag}
                 onChange={(e) => setEditTag(e.target.value)}
                 className="thought-input"
-                style={{
-                  marginBottom: "0.5rem",
-                  padding: "8px",
-                  fontSize: "0.9rem",
-                }}
+                style={{ marginBottom: "0.5rem" }}
                 placeholder="Tag"
               />
               <textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 className="thought-input"
-                rows={3}
+                rows={5}
                 style={{ fontFamily: "inherit", resize: "vertical" }}
               />
               <div
@@ -106,21 +110,18 @@ const ThoughtList: React.FC<Props> = ({
           ) : (
             /* --- VIEW MODE --- */
             <>
-              {/* Checkbox Column */}
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   marginRight: "1rem",
-                  paddingTop: "4px",
                 }}
               >
                 <input
                   type="checkbox"
                   checked={thought.completed}
                   onChange={() => onToggleComplete(thought.id)}
-                  title="Mark as done"
                   style={{
                     width: "20px",
                     height: "20px",
@@ -130,7 +131,6 @@ const ThoughtList: React.FC<Props> = ({
                 />
               </div>
 
-              {/* Content Column */}
               <div className="thought-main">
                 <div
                   style={{
@@ -144,13 +144,8 @@ const ThoughtList: React.FC<Props> = ({
                   <span className="thought-tag">
                     {thought.tag || "General"}
                   </span>
-                  {thought.pinned && (
-                    <span title="Pinned" style={{ fontSize: "0.9rem" }}>
-                      📌
-                    </span>
-                  )}
+                  {thought.pinned && <span title="Pinned">📌</span>}
 
-                  {/* Assignment Dropdown (Only if in a Room) */}
                   {roomMembers && (
                     <select
                       style={{
@@ -178,10 +173,29 @@ const ThoughtList: React.FC<Props> = ({
                       ))}
                     </select>
                   )}
+
+                  {thought.dueDate && (
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: isOverdue(thought.dueDate, thought.completed)
+                          ? "#e74c3c"
+                          : "var(--text-color-muted)",
+                        fontWeight: isOverdue(
+                          thought.dueDate,
+                          thought.completed,
+                        )
+                          ? "bold"
+                          : "normal",
+                      }}
+                    >
+                      📅 {new Date(thought.dueDate).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
 
-                <p
-                  className="thought-content"
+                <div
+                  className="thought-content markdown-body"
                   style={{
                     textDecoration: thought.completed ? "line-through" : "none",
                     color: thought.completed
@@ -189,36 +203,21 @@ const ThoughtList: React.FC<Props> = ({
                       : "var(--text-color)",
                   }}
                 >
-                  {thought.content}
-                </p>
+                  <ReactMarkdown>{thought.content}</ReactMarkdown>
+                </div>
 
-                {/* Updated Date & Time Display */}
                 <small className="thought-date">
                   {thought.createdAt
-                    ? new Date(thought.createdAt).toLocaleDateString() +
-                      " • " +
-                      new Date(thought.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                    ? new Date(thought.createdAt).toLocaleString()
                     : ""}
                 </small>
               </div>
 
-              {/* Actions Column */}
-              <div
-                className="thought-actions"
-                style={{
-                  display: "flex",
-                  gap: "4px",
-                  alignItems: "flex-start",
-                }}
-              >
+              <div className="thought-actions">
                 <button
                   className="action-btn pin-btn"
                   onClick={() => onPin(thought.id)}
-                  title={thought.pinned ? "Unpin" : "Pin"}
-                  style={{ opacity: thought.pinned ? 1 : 0.4 }}
+                  title="Pin"
                 >
                   📌
                 </button>

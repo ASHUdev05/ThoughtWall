@@ -35,14 +35,13 @@ export const useThoughts = (initialFilter: string = "All", roomId?: number) => {
   );
 
   useEffect(() => {
-    // FIX: Clear thoughts immediately to prevent "ghost" data from the previous room
     setThoughts([]);
     fetchThoughts(page, filter, roomId);
   }, [page, filter, roomId, fetchThoughts]);
 
-  const addThought = async (content: string, tag: string) => {
+  const addThought = async (content: string, tag: string, dueDate?: string) => {
     try {
-      await thoughtService.create(content, tag, roomId);
+      await thoughtService.create(content, tag, roomId, dueDate);
       fetchThoughts(0, filter, roomId);
       setPage(0);
       return true;
@@ -51,69 +50,44 @@ export const useThoughts = (initialFilter: string = "All", roomId?: number) => {
     }
   };
 
-  const editThought = async (id: number, content: string, tag: string) => {
-    const thoughtToUpdate = thoughts.find((t) => t.id === id);
-    if (!thoughtToUpdate) return false;
+  // NEW: Generic update method for Kanban drag-and-drop
+  const updateThought = async (updatedThought: Thought) => {
     try {
-      const updated = await thoughtService.update({
-        ...thoughtToUpdate,
-        content,
-        tag,
-      });
-      setThoughts((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      // Optimistic update: Update UI immediately
+      setThoughts((prev) =>
+        prev.map((t) => (t.id === updatedThought.id ? updatedThought : t)),
+      );
+      await thoughtService.update(updatedThought);
       return true;
     } catch {
+      // Revert on failure by refetching
+      fetchThoughts(page, filter, roomId);
       return false;
     }
   };
 
-  const togglePin = async (id: number) => {
+  const editThought = async (id: number, content: string, tag: string) => {
     const thoughtToUpdate = thoughts.find((t) => t.id === id);
     if (!thoughtToUpdate) return false;
-    try {
-      setThoughts((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)),
-      );
-      await thoughtService.update({
-        ...thoughtToUpdate,
-        pinned: !thoughtToUpdate.pinned,
-      });
-      fetchThoughts(page, filter, roomId);
-      return true;
-    } catch {
-      fetchThoughts(page, filter, roomId);
-      return false;
-    }
+    return await updateThought({ ...thoughtToUpdate, content, tag });
+  };
+
+  const togglePin = async (id: number) => {
+    const thought = thoughts.find((t) => t.id === id);
+    if (!thought) return false;
+    return await updateThought({ ...thought, pinned: !thought.pinned });
   };
 
   const toggleComplete = async (id: number) => {
     const thought = thoughts.find((t) => t.id === id);
     if (!thought) return;
-    try {
-      // Optimistic update
-      setThoughts((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
-      );
-      await thoughtService.update({
-        ...thought,
-        completed: !thought.completed,
-      });
-      fetchThoughts(page, filter, roomId); // Refresh to sort
-    } catch {
-      fetchThoughts(page, filter, roomId);
-    }
+    await updateThought({ ...thought, completed: !thought.completed });
   };
 
   const assignUser = async (id: number, user: User | null) => {
     const thought = thoughts.find((t) => t.id === id);
     if (!thought) return;
-    try {
-      await thoughtService.update({ ...thought, assignedTo: user });
-      fetchThoughts(page, filter, roomId);
-    } catch (err) {
-      console.error("Failed to assign task:", err);
-      setError("Could not assign task.");
-    }
+    await updateThought({ ...thought, assignedTo: user });
   };
 
   const removeThought = async (id: number) => {
@@ -132,6 +106,7 @@ export const useThoughts = (initialFilter: string = "All", roomId?: number) => {
     error,
     addThought,
     editThought,
+    updateThought, // Exported for Kanban
     togglePin,
     removeThought,
     toggleComplete,
