@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getHelloMessage } from '../services/helloService';
+import { useState, useEffect } from "react";
+import { getHelloMessage } from "../services/helloService";
 
 // Define the shape of the hook's return value
 interface UseHelloResult {
@@ -24,7 +24,7 @@ export const useHello = (): UseHelloResult => {
         if (err instanceof Error) {
           setError(err.message);
         } else {
-          setError('An unknown error occurred');
+          setError("An unknown error occurred");
         }
       } finally {
         setLoading(false);

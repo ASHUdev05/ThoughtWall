@@ -4,9 +4,9 @@ export interface ApiError {
   status?: number;
 }
 
-const API_BASE_URL = 'http://localhost:8081';
+const API_BASE_URL = "http://localhost:8081";
 
-// Explicitly type the return Promise. 
+// Explicitly type the return Promise.
 // If your API returned a JSON object, you would replace <string> with <YourInterface>
 export const getHelloMessage = async (): Promise<string> => {
   try {
@@ -22,7 +22,7 @@ export const getHelloMessage = async (): Promise<string> => {
     if (error instanceof Error) {
       throw new Error(error.message);
     } else {
-      throw new Error('An unexpected error occurred');
+      throw new Error("An unexpected error occurred");
     }
   }
 };
