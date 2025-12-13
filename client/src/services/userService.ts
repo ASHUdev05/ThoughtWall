@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../config";
 import type { Room } from "./thoughtService";
 
 export interface AssignedTask {
@@ -14,7 +15,7 @@ export interface UserProfile {
   assignedTasks: AssignedTask[];
 }
 
-const API_BASE = "http://localhost:8081/api/users";
+const API_BASE = `${API_BASE_URL}/api/users`;
 
 const getHeaders = () => {
   const token = localStorage.getItem("token");

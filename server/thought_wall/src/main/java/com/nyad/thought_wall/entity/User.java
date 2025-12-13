@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -61,4 +62,17 @@ public class User {
     public void setJoinedRooms(Set<Room> joinedRooms) { this.joinedRooms = joinedRooms; }
     public Set<Room> getOwnedRooms() { return ownedRooms; }
     public void setOwnedRooms(Set<Room> ownedRooms) { this.ownedRooms = ownedRooms; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return Objects.equals(email, user.email);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(email);
+    }
 }

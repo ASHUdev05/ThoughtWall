@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config";
 
 interface Props {
   onLogin: (token: string) => void;
@@ -16,7 +17,8 @@ const AuthForm: React.FC<Props> = ({ onLogin }) => {
     const endpoint = isSignup ? "/api/auth/signup" : "/api/auth/login";
 
     try {
-      const res = await fetch(`http://localhost:8081${endpoint}`, {
+      // Use the centralized configuration URL
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

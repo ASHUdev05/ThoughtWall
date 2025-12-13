@@ -1,6 +1,7 @@
 package com.nyad.thought_wall.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,8 +18,10 @@ import java.util.List;
 public class SecurityConfig {
 
     @Autowired private JwtFilter jwtFilter;
+    
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
-    // 1. ADD: The PasswordEncoder Bean
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -30,18 +33,18 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(_ -> {
                 CorsConfiguration config = new CorsConfiguration();
-                config.setAllowedOriginPatterns(List.of("*"));
+                // FIX: Use specific allowed origin instead of wildcard
+                config.setAllowedOrigins(List.of(frontendUrl));
                 config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                 config.setAllowedHeaders(List.of("*"));
                 config.setAllowCredentials(true);
                 return config;
             }))
             .authorizeHttpRequests(auth -> auth
-                // Modern Spring Security 6 syntax
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/hello", "/error").permitAll()
                 
-                // Allow OPTIONS for pre-flight checks (Critical for React)
+                // Allow OPTIONS for pre-flight checks
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
                 .anyRequest().authenticated()

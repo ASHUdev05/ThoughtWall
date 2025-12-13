@@ -1,30 +1,41 @@
 package com.nyad.thought_wall.security;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
-    // Generate a secure key for HS256 automatically
-    private final SecretKey key = Jwts.SIG.HS256.key().build();
+
+    @Value("${jwt.secret}")
+    private String secretString;
+
+    private SecretKey key;
+
     private final long EXPIRATION = 86400000; // 1 day
+
+    @PostConstruct
+    public void init() {
+        // Create the key from the configured secret string
+        this.key = Keys.hmacShaKeyFor(secretString.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(String email) {
         return Jwts.builder()
-                .subject(email) // Updated: setSubject -> subject
-                .issuedAt(new Date()) // Updated: setIssuedAt -> issuedAt
-                .expiration(new Date(System.currentTimeMillis() + EXPIRATION)) // Updated: setExpiration -> expiration
-                .signWith(key) // Updated: No algorithm needed, it infers from the key
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .signWith(key)
                 .compact();
     }
 
     public String validateTokenAndGetEmail(String token) {
-        // Updated: parserBuilder() -> parser()
-        // Updated: setSigningKey() -> verifyWith()
-        // Updated: parseClaimsJws() -> parseSignedClaims()
-        // Updated: getBody() -> getPayload()
         return Jwts.parser()
                 .verifyWith(key)
                 .build()

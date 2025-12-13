@@ -3,6 +3,7 @@ package com.nyad.thought_wall.entity;
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -56,4 +57,17 @@ public class Room {
     public Set<User> getMembers() { return members; }
     public void setMembers(Set<User> members) { this.members = members; }
     public void addMember(User user) { this.members.add(user); }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Room room = (Room) o;
+        return Objects.equals(code, room.code);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(code);
+    }
 }

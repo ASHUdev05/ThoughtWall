@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../config";
+
 export interface User {
   id: number;
   email: string;
@@ -28,7 +30,7 @@ export interface PageResponse<T> {
   size: number;
 }
 
-const API_BASE = "http://localhost:8081/api";
+const API_BASE = `${API_BASE_URL}/api`;
 
 const getHeaders = () => {
   const token = localStorage.getItem("token");
