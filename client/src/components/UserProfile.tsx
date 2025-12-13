@@ -1,20 +1,16 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { userService, type UserProfile } from "../services/userService";
 import { roomService } from "../services/thoughtService";
 
 interface Props {
-  onClose: () => void;
   onLogout: () => void;
-  onNavigateToRoom: (id: number) => void;
 }
 
-const UserProfileView: React.FC<Props> = ({
-  onClose,
-  onLogout,
-  onNavigateToRoom,
-}) => {
+const UserProfileView: React.FC<Props> = ({ onLogout }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadProfile();
@@ -58,6 +54,10 @@ const UserProfileView: React.FC<Props> = ({
     }
   };
 
+  const handleClose = () => {
+    navigate("/");
+  };
+
   if (loading) return <div className="loading-spinner">Loading Profile...</div>;
   if (!profile) return <div>Error loading profile</div>;
 
@@ -79,7 +79,7 @@ const UserProfileView: React.FC<Props> = ({
         }}
       >
         <h2 style={{ margin: 0 }}>My Profile</h2>
-        <button className="tag-btn" onClick={onClose}>
+        <button className="tag-btn" onClick={handleClose}>
           Close
         </button>
       </div>
@@ -119,8 +119,8 @@ const UserProfileView: React.FC<Props> = ({
                   <button
                     className="action-btn"
                     onClick={() => {
-                      onNavigateToRoom(r.id);
-                      onClose();
+                      // Navigate to dashboard with room ID query param
+                      navigate(`/?roomId=${r.id}`);
                     }}
                     title="Go to room"
                   >

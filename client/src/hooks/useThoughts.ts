@@ -35,6 +35,8 @@ export const useThoughts = (initialFilter: string = "All", roomId?: number) => {
   );
 
   useEffect(() => {
+    // FIX: Clear thoughts immediately to prevent "ghost" data from the previous room
+    setThoughts([]);
     fetchThoughts(page, filter, roomId);
   }, [page, filter, roomId, fetchThoughts]);
 

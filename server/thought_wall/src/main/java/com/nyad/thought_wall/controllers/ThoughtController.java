@@ -41,8 +41,13 @@ public class ThoughtController {
 
         if (roomId != null) {
             // Room Context
-            Room room = roomRepository.findById(roomId).orElseThrow();
-            User user = userRepository.findByEmail(email).orElseThrow();
+            // FIX: Handle missing room gracefully
+            Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
+            
+            User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            
             // Valid member check
             if(!room.getMembers().contains(user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 
@@ -71,7 +76,10 @@ public class ThoughtController {
         thought.setCompleted(false);
 
         if (request.roomId != null) {
-            Room room = roomRepository.findById(request.roomId).orElseThrow();
+            // FIX: Specific error if room doesn't exist
+            Room room = roomRepository.findById(request.roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
+            
             if(!room.getMembers().contains(user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
             thought.setRoom(room);
         }
@@ -82,7 +90,7 @@ public class ThoughtController {
     @PutMapping("/{id}")
     public Thought updateThought(@PathVariable Long id, @RequestBody Thought updates, Principal principal) {
         Thought thought = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thought not found"));
         
         // Ensure user has access (simplified: either owner or in the same room)
         boolean isOwner = thought.getUser().getEmail().equals(principal.getName());
@@ -110,7 +118,9 @@ public class ThoughtController {
 
     @DeleteMapping("/{id}")
     public void deleteThought(@PathVariable Long id, Principal principal) {
-        Thought thought = repository.findById(id).orElseThrow();
+        Thought thought = repository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thought not found"));
+        
         // Only owner can delete (or room admin - logic kept simple for now)
         if (!thought.getUser().getEmail().equals(principal.getName())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
