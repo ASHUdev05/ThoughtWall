@@ -12,10 +12,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/thoughts")
@@ -25,30 +27,33 @@ public class ThoughtController {
     @Autowired private ThoughtRepository repository;
     @Autowired private UserRepository userRepository;
     @Autowired private RoomRepository roomRepository;
+    @Autowired private SimpMessagingTemplate messagingTemplate;
 
     @GetMapping
     public Page<Thought> getAllThoughts(
             @RequestParam(required = false) Long roomId,
             @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "10") int size, // Increased default size
             Principal principal
     ) {
-        // Sort: Incomplete tasks first, then Pinned, then Newest
-        Sort sort = Sort.by(Sort.Order.asc("completed"), Sort.Order.desc("pinned"), Sort.Order.desc("createdAt"));
+        // Sort: Incomplete first, then by Due Date (soonest first), then Pinned, then Newest
+        Sort sort = Sort.by(
+            Sort.Order.asc("completed"),
+            Sort.Order.asc("dueDate"), // Nulls usually come last in DBs, varies by dialect
+            Sort.Order.desc("pinned"),
+            Sort.Order.desc("createdAt")
+        );
         Pageable pageable = PageRequest.of(page, size, sort);
         String email = principal.getName();
 
         if (roomId != null) {
-            // Room Context
-            // FIX: Handle missing room gracefully
             Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
             
             User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
             
-            // Valid member check
             if(!room.getMembers().contains(user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 
             if (tag != null && !tag.equals("All") && !tag.isEmpty()) {
@@ -56,7 +61,6 @@ public class ThoughtController {
             }
             return repository.findByRoomId(roomId, pageable);
         } else {
-            // Personal Context
             if (tag != null && !tag.equals("All") && !tag.isEmpty()) {
                 return repository.findPersonalThoughtsByTag(email, tag, pageable);
             }
@@ -73,10 +77,10 @@ public class ThoughtController {
         thought.setContent(request.content);
         thought.setTag(request.tag);
         thought.setUser(user);
+        thought.setDueDate(request.dueDate);
         thought.setCompleted(false);
 
         if (request.roomId != null) {
-            // FIX: Specific error if room doesn't exist
             Room room = roomRepository.findById(request.roomId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
             
@@ -84,7 +88,9 @@ public class ThoughtController {
             thought.setRoom(room);
         }
         
-        return repository.save(thought);
+        Thought saved = repository.save(thought);
+        notifyRoom(saved.getRoom());
+        return saved;
     }
 
     @PutMapping("/{id}")
@@ -92,7 +98,6 @@ public class ThoughtController {
         Thought thought = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thought not found"));
         
-        // Ensure user has access (simplified: either owner or in the same room)
         boolean isOwner = thought.getUser().getEmail().equals(principal.getName());
         boolean inSameRoom = thought.getRoom() != null && thought.getRoom().getMembers().stream()
                              .anyMatch(u -> u.getEmail().equals(principal.getName()));
@@ -105,6 +110,7 @@ public class ThoughtController {
         thought.setTag(updates.getTag());
         thought.setPinned(updates.isPinned());
         thought.setCompleted(updates.isCompleted());
+        thought.setDueDate(updates.getDueDate());
         
         if (updates.getAssignedTo() != null) {
              User assignee = userRepository.findById(updates.getAssignedTo().getId()).orElse(null);
@@ -113,7 +119,9 @@ public class ThoughtController {
              thought.setAssignedTo(null);
         }
 
-        return repository.save(thought);
+        Thought saved = repository.save(thought);
+        notifyRoom(saved.getRoom());
+        return saved;
     }
 
     @DeleteMapping("/{id}")
@@ -121,11 +129,12 @@ public class ThoughtController {
         Thought thought = repository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Thought not found"));
         
-        // Only owner can delete (or room admin - logic kept simple for now)
         if (!thought.getUser().getEmail().equals(principal.getName())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        Room room = thought.getRoom();
         repository.deleteById(id);
+        notifyRoom(room);
     }
     
     @PutMapping("/tags/migrate")
@@ -133,10 +142,18 @@ public class ThoughtController {
         repository.updateTagForUser(oldTag, newTag, principal.getName());
     }
 
+    private void notifyRoom(Room room) {
+        if (room != null) {
+            // Broadcast to subscribers of this room
+            messagingTemplate.convertAndSend("/topic/room/" + room.getId(), "UPDATE");
+        }
+    }
+
     // DTO
     static class ThoughtRequest {
         public String content;
         public String tag;
         public Long roomId;
+        public LocalDateTime dueDate;
     }
 }
