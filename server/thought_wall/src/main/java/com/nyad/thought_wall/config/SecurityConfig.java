@@ -1,4 +1,4 @@
-package com.nyad.thought_wall.security;
+package com.nyad.thought_wall.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +11,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+
+import com.nyad.thought_wall.security.JwtFilter;
 
 import java.util.List;
 
@@ -43,6 +45,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/hello", "/error").permitAll()
+                .requestMatchers("/ws/**").permitAll()
                 
                 // Allow OPTIONS for pre-flight checks
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

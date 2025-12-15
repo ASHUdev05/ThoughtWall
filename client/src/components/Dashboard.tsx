@@ -1,331 +1,246 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
-import SockJS from "sockjs-client";
-import Stomp from "stompjs";
-import { API_BASE_URL } from "../config";
+import React, { useState, useEffect } from 'react';
+import { Client, type IMessage } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+import { API_BASE_URL } from '../config';
 
-import RoomManager from "./RoomManager";
-import ThoughtForm from "./ThoughtForm";
-import ThoughtList from "./ThoughtList";
-import KanbanBoard from "./KanbanBoard";
-import { useThoughts } from "../hooks/useThoughts";
-import {
-  thoughtService,
-  roomService,
-  type User,
-} from "../services/thoughtService";
+// Components
+import ThoughtList from './ThoughtList';
+import KanbanBoard from './KanbanBoard';
+import ThoughtForm from './ThoughtForm';
+import RoomManager from './RoomManager';
+import ChatWidget from './ChatWidget';
+import Toast from './Toast';
 
-interface Props {
-  showToast: (msg: string, type: "success" | "error") => void;
-}
+// Hooks & Services
+import { useThoughts } from '../hooks/useThoughts';
+import { userService } from '../services/userService';
 
-// Define minimal types for Stomp to satisfy TypeScript without 'any'
-interface StompMessage {
-  body: string;
-}
+// Styles
+import './Dashboard.css';
 
-interface StompSubscription {
-  id: string;
-  unsubscribe: () => void;
-}
+const Dashboard: React.FC = () => {
+  // --- State ---
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  // Changed to number | undefined to match RoomManager and Service types
+  const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(undefined);
+  
+  // Tag management state (needed for ThoughtForm/Kanban)
+  const [availableTags, setAvailableTags] = useState<string[]>(['General', 'Idea', 'To-Do', 'Important']);
+  const defaultTags = ['General', 'Idea', 'To-Do', 'Important'];
 
-interface StompClient {
-  debug: (str: string) => void;
-  connect: (
-    headers: Record<string, unknown>,
-    onConnect: (frame: unknown) => void,
-    onError: (error: unknown) => void,
-  ) => void;
-  subscribe: (
-    destination: string,
-    callback: (message: StompMessage) => void,
-  ) => StompSubscription;
-  disconnect: (callback: () => void) => void;
-}
+  // WebSocket State
+  const [stompClient, setStompClient] = useState<Client | null>(null);
+  const [connected, setConnected] = useState(false);
 
-const Dashboard: React.FC<Props> = ({ showToast }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const roomIdParam = searchParams.get("roomId");
-  const activeRoomId = roomIdParam ? Number(roomIdParam) : undefined;
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const [roomMembers, setRoomMembers] = useState<User[]>([]);
-  const [viewMode, setViewMode] = useState<"list" | "board">("list");
-
-  const defaultTags = ["General", "Idea", "To-Do", "Journal", "Dream"];
-  const [customTags, setCustomTags] = useState<string[]>([]);
-  const availableTags = [...defaultTags, ...customTags];
-
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [searchTerm, setSearchTerm] = useState("");
-
+  // --- Hook Usage ---
+  // We destructure the actual names exported by useThoughts
   const {
     thoughts,
     loading,
-    addThought,
-    editThought,
-    updateThought,
+    error,
+    refresh,        // was fetchThoughts
+    addThought,     // was createThought
+    removeThought,  // was deleteThought
+    editThought,    // was updateThought (for content edits)
+    updateThought,  // generic update (for Kanban moves)
     togglePin,
-    removeThought,
-    toggleComplete,
-    assignUser,
-    page,
-    setPage,
-    totalPages,
-    setFilter,
-    refresh,
-  } = useThoughts("All", activeRoomId);
+    toggleComplete, // was toggleCompletion
+    assignUser
+  } = useThoughts("All", currentRoomId);
 
-  // --- WebSocket Logic ---
-
-  // 1. Keep a ref to the Stomp client to manage lifecycle
-  const stompClientRef = useRef<StompClient | null>(null);
-
-  // 2. Keep a ref to the 'refresh' function.
-  // This allows us to call the LATEST refresh function inside the WebSocket callback
-  // WITHOUT adding 'refresh' to the useEffect dependency array (which would cause loops).
-  const refreshRef = useRef(refresh);
-
-  // Update the ref whenever 'refresh' changes (e.g. page/filter changes)
+  // --- WebSocket Connection Logic ---
   useEffect(() => {
-    refreshRef.current = refresh;
-  }, [refresh]);
-
-  useEffect(() => {
-    // Only connect if we are in a room
-    if (activeRoomId) {
-      const socket = new SockJS(`${API_BASE_URL}/ws`);
-      // Cast to our defined interface
-      const client = Stomp.over(socket) as StompClient;
-
-      client.debug = () => {}; // Disable logs
-
-      client.connect(
-        {},
-        () => {
-          // Subscribe to room topic
-          client.subscribe(
-            `/topic/room/${activeRoomId}`,
-            (message: StompMessage) => {
-              if (message.body === "UPDATE") {
-                // Call the function stored in the ref
-                refreshRef.current();
-              }
-            },
-          );
-        },
-        (err: unknown) => {
-          console.error("WS Error:", err);
-        },
-      );
-
-      stompClientRef.current = client;
-
-      // Cleanup: Disconnect on unmount or room change
-      return () => {
-        if (client) {
-          client.disconnect(() => {});
+    const socket = new SockJS(`${API_BASE_URL}/ws`);
+    const client = new Client({
+      webSocketFactory: () => socket,
+      debug: (str) => console.log('STOMP: ' + str),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        setConnected(true);
+        if (currentRoomId) {
+          subscribeToRoom(client, currentRoomId);
         }
-      };
-    }
-  }, [activeRoomId]); // Only re-run if the Room ID changes
+      },
+      onDisconnect: () => {
+        setConnected(false);
+      },
+      onStompError: (frame) => {
+        console.error('Broker reported error: ' + frame.headers['message']);
+        showToast('Connection error', 'error');
+      },
+    });
 
-  // --- Normal Dashboard Logic ---
+    client.activate();
+    setStompClient(client);
 
-  const handleSwitchRoom = (id?: number) => {
-    if (id) {
-      setSearchParams({ roomId: id.toString() });
-    } else {
-      setSearchParams({});
-    }
-    setActiveFilter("All");
-    setFilter("All");
-    setPage(0);
-    if (!id) setRoomMembers([]);
-  };
+    return () => {
+      client.deactivate();
+    };
+  }, []);
 
+  // Handle Room Switching for WebSockets
   useEffect(() => {
-    if (activeRoomId) {
-      roomService
-        .getMembers(activeRoomId)
-        .then(setRoomMembers)
-        .catch(console.error);
+    if (stompClient && connected && currentRoomId) {
+      subscribeToRoom(stompClient, currentRoomId);
     }
-  }, [activeRoomId]);
+  }, [currentRoomId, stompClient, connected]);
 
-  const handleAddThought = async (
-    content: string,
-    tag: string,
-    dueDate?: string,
-  ) => {
-    if (tag && !availableTags.includes(tag))
-      setCustomTags((prev) => [...prev, tag]);
-    const success = await addThought(content, tag, dueDate);
-    if (success) showToast("Thought captured!", "success");
-    return success;
+  const subscribeToRoom = (client: Client, roomId: number) => {
+    client.subscribe(`/topic/room/${roomId}`, (message: IMessage) => {
+      if (message.body === 'UPDATE') {
+        refresh();
+        showToast('Board updated', 'success');
+      }
+    });
   };
 
-  const handleEditThought = async (
-    id: number,
-    content: string,
-    tag: string,
-  ) => {
-    if (tag && !availableTags.includes(tag))
-      setCustomTags((prev) => [...prev, tag]);
-    const success = await editThought(id, content, tag);
-    if (success) showToast("Thought updated!", "success");
-    return success;
+  // --- Handlers ---
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
   };
 
-  const handleDeleteTag = async (tagToDelete: string) => {
-    setCustomTags((prev) => prev.filter((t) => t !== tagToDelete));
-    if (activeFilter === tagToDelete) {
-      setActiveFilter("All");
-      setFilter("All");
-      setPage(0);
-    }
-    try {
-      await thoughtService.migrateTag(tagToDelete, "General");
-      refresh();
-      showToast("Tag deleted.", "success");
-    } catch {
-      showToast("Failed to delete tag.", "error");
-    }
+  const handleRoomChange = (roomId?: number) => {
+    setCurrentRoomId(roomId);
   };
 
-  const displayedThoughts = thoughts.filter((t) =>
-    t.content.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const handleLogout = () => {
+    userService.logout();
+    window.location.reload();
+  };
+
+  // Tag Handlers for ThoughtForm
+  const handleDeleteTag = (tag: string) => {
+    setAvailableTags(prev => prev.filter(t => t !== tag));
+  };
+
+  // --- Render ---
 
   return (
-    <>
-      <RoomManager
-        activeRoomId={activeRoomId}
-        onRoomSelect={handleSwitchRoom}
-      />
-
-      <ThoughtForm
-        onAdd={handleAddThought}
-        availableTags={availableTags}
-        defaultTags={defaultTags}
-        onDeleteTag={handleDeleteTag}
-      />
-
-      <div
-        style={{
-          marginBottom: "1rem",
-          display: "flex",
-          gap: "1rem",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <input
-          type="text"
-          placeholder="🔍 Search..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="thought-input"
-          style={{ maxWidth: "300px" }}
-        />
-
-        <div className="filter-options">
-          <button
-            className={`filter-chip ${viewMode === "list" ? "active" : ""}`}
-            onClick={() => setViewMode("list")}
-          >
-            ☰ List
-          </button>
-          <button
-            className={`filter-chip ${viewMode === "board" ? "active" : ""}`}
-            onClick={() => setViewMode("board")}
-          >
-            ☷ Board
-          </button>
-        </div>
-      </div>
-
-      <div className="filter-bar">
-        <div className="filter-options">
-          <button
-            onClick={() => {
-              setActiveFilter("All");
-              setFilter("All");
-              setPage(0);
-            }}
-            className={`filter-chip ${activeFilter === "All" ? "active" : ""}`}
-          >
-            All
-          </button>
-          {availableTags.map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                setActiveFilter(t);
-                setFilter(t);
-                setPage(0);
-              }}
-              className={`filter-chip ${activeFilter === t ? "active" : ""}`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {viewMode === "list" ? (
-        <>
-          <ThoughtList
-            thoughts={displayedThoughts}
-            loading={loading}
-            onDelete={async (id) => {
-              if (await removeThought(id)) showToast("Deleted", "success");
-            }}
-            onEdit={handleEditThought}
-            onPin={togglePin}
-            onToggleComplete={toggleComplete}
-            onAssign={assignUser}
-            roomMembers={activeRoomId ? roomMembers : undefined}
+    <div className="dashboard-container">
+      {/* Header */}
+      <header className="dashboard-header">
+        <div className="header-left">
+          <h1>ThoughtWall</h1>
+          {/* Fixed Props: activeRoomId, onRoomSelect */}
+          <RoomManager 
+            activeRoomId={currentRoomId} 
+            onRoomSelect={handleRoomChange} 
           />
-
-          {totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "1rem",
-                marginTop: "1rem",
-              }}
+        </div>
+        <div className="header-right">
+          <div className="view-toggles">
+            <button 
+              className={viewMode === 'list' ? 'active' : ''} 
+              onClick={() => setViewMode('list')}
             >
-              <button
-                className="tag-btn"
-                disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </button>
-              <span>
-                {page + 1} / {totalPages}
-              </span>
-              <button
-                className="tag-btn"
-                disabled={page + 1 >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
-      ) : (
-        <KanbanBoard
-          thoughts={displayedThoughts}
-          availableTags={availableTags}
-          onUpdateThought={updateThought}
-          roomMembers={activeRoomId ? roomMembers : undefined}
+              List
+            </button>
+            <button 
+              className={viewMode === 'kanban' ? 'active' : ''} 
+              onClick={() => setViewMode('kanban')}
+            >
+              Kanban
+            </button>
+          </div>
+          
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="dashboard-content">
+        {loading && <div className="loading-spinner">Loading thoughts...</div>}
+        {error && <div className="error-message">{error}</div>}
+
+        <div className="action-bar">
+          <button className="add-thought-btn" onClick={() => setIsFormOpen(true)}>
+            + New Thought
+          </button>
+          <div className="connection-status">
+            Status: <span className={connected ? 'status-ok' : 'status-err'}>
+              {connected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+        </div>
+
+        {viewMode === 'list' ? (
+          <ThoughtList
+            thoughts={thoughts}
+            loading={loading}
+            onDelete={removeThought}
+            onToggleComplete={toggleComplete}
+            onPin={togglePin}
+            onEdit={editThought}
+            onAssign={assignUser}
+            // roomMembers={[]} // You can pass real members here if you fetch them
+          />
+        ) : (
+          <KanbanBoard
+            thoughts={thoughts}
+            availableTags={availableTags}
+            onUpdateThought={updateThought}
+            // roomMembers={[]} 
+          />
+        )}
+      </main>
+
+      {/* Modal */}
+      {isFormOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <ThoughtForm
+              // Fixed Props: onAdd, availableTags, etc.
+              onAdd={async (content, tag, dueDate) => {
+                const success = await addThought(content, tag, dueDate);
+                if (success) {
+                  setIsFormOpen(false);
+                  showToast('Thought created!', 'success');
+                  // Add tag to local list if it's new
+                  if (!availableTags.includes(tag)) {
+                    setAvailableTags(prev => [...prev, tag]);
+                  }
+                }
+                return success;
+              }}
+              availableTags={availableTags}
+              defaultTags={defaultTags}
+              onDeleteTag={handleDeleteTag}
+            />
+            <button 
+              className="tag-btn" 
+              style={{marginTop: '10px'}} 
+              onClick={() => setIsFormOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)} // Fixed: Added onClose
         />
       )}
-    </>
+
+      {/* Chat Widget */}
+      {currentRoomId && (
+        <ChatWidget 
+          roomId={currentRoomId.toString()} // Convert number to string for ChatWidget
+          stompClient={stompClient} 
+          connected={connected} 
+        />
+      )}
+    </div>
   );
 };
 
