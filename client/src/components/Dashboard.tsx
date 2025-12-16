@@ -9,7 +9,7 @@ import KanbanBoard from './KanbanBoard';
 import ThoughtForm from './ThoughtForm';
 import RoomManager from './RoomManager';
 import ChatWidget from './ChatWidget';
-import Toast from './Toast';
+// Note: We don't import Toast here anymore because we use the one passed from App.tsx
 
 // Hooks & Services
 import { useThoughts } from '../hooks/useThoughts';
@@ -18,7 +18,13 @@ import { userService } from '../services/userService';
 // Styles
 import './Dashboard.css';
 
-const Dashboard: React.FC = () => {
+// 1. Define the props interface
+interface DashboardProps {
+  showToast: (message: string, type: 'success' | 'error') => void;
+}
+
+// 2. Update the component to accept the prop
+const Dashboard: React.FC<DashboardProps> = ({ showToast }) => {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(undefined);
@@ -27,7 +33,8 @@ const Dashboard: React.FC = () => {
 
   const [stompClient, setStompClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // 3. Removed local 'toast' state since we are using the parent's showToast
 
   const {
     thoughts,
@@ -73,14 +80,12 @@ const Dashboard: React.FC = () => {
     client.subscribe(`/topic/room/${roomId}`, (message: IMessage) => {
       if (message.body === 'UPDATE') {
         refresh();
-        showToast('Board updated', 'success');
+        showToast('Board updated', 'success'); // This now uses the prop
       }
     });
   };
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-  };
+  // 4. Removed local showToast function definition
 
   const handleRoomChange = (roomId?: number) => {
     setCurrentRoomId(roomId);
@@ -188,7 +193,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {/* 5. Removed local <Toast /> render since App.tsx handles it globally */}
       {currentRoomId && <ChatWidget roomId={currentRoomId.toString()} stompClient={stompClient} connected={connected} />}
     </div>
   );
