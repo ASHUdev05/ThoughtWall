@@ -6,6 +6,9 @@ import com.nyad.thought_wall.entity.User;
 import com.nyad.thought_wall.repository.ThoughtRepository;
 import com.nyad.thought_wall.repository.UserRepository;
 import com.nyad.thought_wall.repository.RoomRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,13 +37,12 @@ public class ThoughtController {
             @RequestParam(required = false) Long roomId,
             @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size, // Increased default size
+            @RequestParam(defaultValue = "10") int size,
             Principal principal
     ) {
-        // Sort: Incomplete first, then by Due Date (soonest first), then Pinned, then Newest
         Sort sort = Sort.by(
             Sort.Order.asc("completed"),
-            Sort.Order.asc("dueDate"), // Nulls usually come last in DBs, varies by dialect
+            Sort.Order.asc("dueDate"),
             Sort.Order.desc("pinned"),
             Sort.Order.desc("createdAt")
         );
@@ -69,13 +71,13 @@ public class ThoughtController {
     }
 
     @PostMapping
-    public Thought createThought(@RequestBody ThoughtRequest request, Principal principal) {
+    public Thought createThought(@Valid @RequestBody ThoughtRequest request, Principal principal) {
         User user = userRepository.findByEmail(principal.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         
         Thought thought = new Thought();
         thought.setContent(request.content);
-        thought.setTag(request.tag);
+        thought.setTag(request.tag == null || request.tag.isEmpty() ? "General" : request.tag);
         thought.setUser(user);
         thought.setDueDate(request.dueDate);
         thought.setCompleted(false);
@@ -106,8 +108,10 @@ public class ThoughtController {
              throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
-        thought.setContent(updates.getContent());
-        thought.setTag(updates.getTag());
+        if (updates.getContent() != null && !updates.getContent().isBlank()) {
+            thought.setContent(updates.getContent());
+        }
+        if (updates.getTag() != null) thought.setTag(updates.getTag());
         thought.setPinned(updates.isPinned());
         thought.setCompleted(updates.isCompleted());
         thought.setDueDate(updates.getDueDate());
@@ -144,15 +148,18 @@ public class ThoughtController {
 
     private void notifyRoom(Room room) {
         if (room != null) {
-            // Broadcast to subscribers of this room
             messagingTemplate.convertAndSend("/topic/room/" + room.getId(), "UPDATE");
         }
     }
 
-    // DTO
     static class ThoughtRequest {
+        @NotBlank(message = "Content cannot be empty")
+        @Size(max = 1000, message = "Content too long")
         public String content;
+        
+        @Size(max = 20, message = "Tag too long")
         public String tag;
+        
         public Long roomId;
         public LocalDateTime dueDate;
     }

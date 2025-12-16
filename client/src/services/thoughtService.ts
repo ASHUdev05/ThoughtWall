@@ -12,12 +12,18 @@ export interface Room {
   owner?: User;
 }
 
+export interface RoomRequest {
+  id: number;
+  user: User;
+  requestedAt: string;
+}
+
 export interface Thought {
   id: number;
   content: string;
   tag?: string;
   createdAt?: string;
-  dueDate?: string; // New Field
+  dueDate?: string;
   pinned: boolean;
   completed: boolean;
   assignedTo?: User | null;
@@ -47,7 +53,7 @@ export const thoughtService = {
     tag: string = "All",
     roomId?: number,
   ): Promise<PageResponse<Thought>> => {
-    const params = new URLSearchParams({ page: page.toString(), size: "20" }); // Increased size
+    const params = new URLSearchParams({ page: page.toString(), size: "20" });
     if (tag && tag !== "All") params.append("tag", tag);
     if (roomId) params.append("roomId", roomId.toString());
 
@@ -113,13 +119,16 @@ export const roomService = {
     });
     return response.json();
   },
-  join: async (code: string): Promise<Room> => {
+  join: async (code: string): Promise<{ message: string }> => {
     const response = await fetch(`${API_BASE}/rooms/join/${code}`, {
       method: "POST",
       headers: getHeaders(),
     });
-    if (!response.ok) throw new Error("Invalid Room Code");
-    return response.json();
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err || "Failed to join room");
+    }
+    return response.json(); // Returns message
   },
   getMyRooms: async (): Promise<Room[]> => {
     const response = await fetch(`${API_BASE}/rooms`, {
@@ -140,4 +149,33 @@ export const roomService = {
     });
     if (!response.ok) throw new Error("Failed to delete room");
   },
+  // NEW: Moderation Methods
+  getRequests: async (roomId: number): Promise<RoomRequest[]> => {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}/requests`, {
+        headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error("Failed to fetch requests");
+    return response.json();
+  },
+  approveRequest: async (roomId: number, requestId: number): Promise<void> => {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}/requests/${requestId}/approve`, {
+        method: "POST",
+        headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error("Failed to approve request");
+  },
+  rejectRequest: async (roomId: number, requestId: number): Promise<void> => {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}/requests/${requestId}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error("Failed to reject request");
+  },
+  kickUser: async (roomId: number, userId: number): Promise<void> => {
+    const response = await fetch(`${API_BASE}/rooms/${roomId}/members/${userId}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error("Failed to kick user");
+  }
 };

@@ -1,15 +1,24 @@
 import React, { useState } from "react";
 import type { Thought, User } from "../services/thoughtService";
 import ReactMarkdown from "react-markdown";
-import "./ThoughtList.css"; // Reuse basic styles
+import "./ThoughtList.css";
 
 interface Props {
   thoughts: Thought[];
   availableTags: string[];
-  // FIX: Allow Promise<boolean> to match the hook's return type
   onUpdateThought: (thought: Thought) => Promise<boolean | void>;
   roomMembers?: User[];
 }
+
+// Helper to generate consistent pastel colors from strings
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = hash % 360;
+  return `hsl(${h}, 60%, 85%)`; // Pastel HSL
+};
 
 const KanbanBoard: React.FC<Props> = ({
   thoughts,
@@ -18,15 +27,12 @@ const KanbanBoard: React.FC<Props> = ({
 }) => {
   const [draggedThoughtId, setDraggedThoughtId] = useState<number | null>(null);
 
-  // Group thoughts by tag
   const columns: Record<string, Thought[]> = {};
   availableTags.forEach((tag) => (columns[tag] = []));
-  // Add an "Other" column for tags not in availableTags
   columns["Other"] = [];
 
   thoughts.forEach((t) => {
     const tag = t.tag && availableTags.includes(t.tag) ? t.tag : "Other";
-    // If tag is not in availableTags (and not caught by above), put in Other
     if (columns[tag]) columns[tag].push(t);
     else columns["Other"].push(t);
   });
@@ -59,46 +65,54 @@ const KanbanBoard: React.FC<Props> = ({
     <div
       style={{
         display: "flex",
-        gap: "1rem",
+        gap: "1.5rem",
         overflowX: "auto",
         padding: "1rem",
         height: "calc(100vh - 200px)",
       }}
     >
-      {Object.entries(columns).map(([tag, items]) => (
+      {Object.entries(columns).map(([tag, items]) => {
+        const headerColor = stringToColor(tag);
+        
+        return (
         <div
           key={tag}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, tag)}
           style={{
-            minWidth: "300px",
+            minWidth: "320px",
             background: "var(--card-bg)",
-            borderRadius: "8px",
-            padding: "1rem",
+            borderRadius: "16px",
             display: "flex",
             flexDirection: "column",
             border: "1px solid var(--border-color)",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
+            overflow: "hidden"
           }}
         >
-          <h3
-            style={{
-              marginBottom: "1rem",
-              borderBottom: "2px solid var(--primary-color)",
-              paddingBottom: "0.5rem",
-            }}
-          >
-            {tag}{" "}
-            <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-              ({items.length})
+          <div style={{
+              background: headerColor, 
+              padding: "1rem", 
+              borderBottom: "1px solid rgba(0,0,0,0.05)",
+              color: "#333",
+              fontWeight: "bold",
+              display: "flex",
+              justifyContent: "space-between"
+          }}>
+            <span>{tag}</span>
+            <span style={{ background: "rgba(255,255,255,0.6)", borderRadius: "12px", padding: "2px 8px", fontSize: "0.8rem" }}>
+              {items.length}
             </span>
-          </h3>
+          </div>
+          
           <div
             style={{
               flex: 1,
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",
-              gap: "0.5rem",
+              gap: "0.8rem",
+              padding: "1rem"
             }}
           >
             {items.map((thought) => (
@@ -111,36 +125,34 @@ const KanbanBoard: React.FC<Props> = ({
                   cursor: "grab",
                   margin: 0,
                   opacity: thought.completed ? 0.6 : 1,
-                  borderLeft: thought.pinned
-                    ? "4px solid var(--accent-color)"
-                    : undefined,
+                  borderLeft: thought.pinned ? "4px solid var(--accent-color)" : `4px solid ${headerColor}`,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
                 }}
               >
-                <div
-                  style={{
-                    fontSize: "0.9rem",
-                    maxHeight: "100px",
-                    overflow: "hidden",
-                  }}
-                >
+                <div style={{ fontSize: "0.9rem", maxHeight: "120px", overflow: "hidden", position: 'relative' }}>
                   <ReactMarkdown>{thought.content}</ReactMarkdown>
+                  {/* Fade out effect for long text */}
+                  <div style={{position:'absolute', bottom:0, left:0, right:0, height:'20px', background:'linear-gradient(transparent, var(--card-bg))'}}></div>
                 </div>
-                {thought.dueDate && (
-                  <div
-                    style={{
-                      fontSize: "0.75rem",
-                      marginTop: "4px",
-                      color: "var(--text-color-muted)",
-                    }}
-                  >
-                    📅 {new Date(thought.dueDate).toLocaleDateString()}
-                  </div>
-                )}
+                
+                <div style={{display:'flex', justifyContent:'space-between', marginTop:'8px', alignItems:'center'}}>
+                    {thought.assignedTo ? (
+                        <div style={{fontSize:'0.75rem', background:'var(--border-color)', padding:'2px 6px', borderRadius:'4px'}} title={thought.assignedTo.email}>
+                            👤 {thought.assignedTo.email.split('@')[0]}
+                        </div>
+                    ) : <div />}
+                    
+                    {thought.dueDate && (
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-color-muted)" }}>
+                        📅 {new Date(thought.dueDate).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                    </div>
+                    )}
+                </div>
               </div>
             ))}
           </div>
         </div>
-      ))}
+      )})}
     </div>
   );
 };

@@ -19,71 +19,50 @@ import { userService } from '../services/userService';
 import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
-  // --- State ---
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  
-  // Changed to number | undefined to match RoomManager and Service types
   const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(undefined);
-  
-  // Tag management state (needed for ThoughtForm/Kanban)
   const [availableTags, setAvailableTags] = useState<string[]>(['General', 'Idea', 'To-Do', 'Important']);
   const defaultTags = ['General', 'Idea', 'To-Do', 'Important'];
 
-  // WebSocket State
   const [stompClient, setStompClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
-
-  // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // --- Hook Usage ---
-  // We destructure the actual names exported by useThoughts
   const {
     thoughts,
     loading,
     error,
-    refresh,        // was fetchThoughts
-    addThought,     // was createThought
-    removeThought,  // was deleteThought
-    editThought,    // was updateThought (for content edits)
-    updateThought,  // generic update (for Kanban moves)
+    refresh,
+    addThought,
+    removeThought,
+    editThought,
+    updateThought,
     togglePin,
-    toggleComplete, // was toggleCompletion
-    assignUser
+    toggleComplete,
+    assignUser,
+    page,
+    setPage,
+    totalPages
   } = useThoughts("All", currentRoomId);
 
-  // --- WebSocket Connection Logic ---
   useEffect(() => {
     const socket = new SockJS(`${API_BASE_URL}/ws`);
     const client = new Client({
       webSocketFactory: () => socket,
-      debug: (str) => console.log('STOMP: ' + str),
       reconnectDelay: 5000,
       onConnect: () => {
         setConnected(true);
-        if (currentRoomId) {
-          subscribeToRoom(client, currentRoomId);
-        }
+        if (currentRoomId) subscribeToRoom(client, currentRoomId);
       },
-      onDisconnect: () => {
-        setConnected(false);
-      },
-      onStompError: (frame) => {
-        console.error('Broker reported error: ' + frame.headers['message']);
-        showToast('Connection error', 'error');
-      },
+      onDisconnect: () => setConnected(false),
     });
 
     client.activate();
     setStompClient(client);
-
-    return () => {
-      client.deactivate();
-    };
+    return () => { client.deactivate(); };
   }, []);
 
-  // Handle Room Switching for WebSockets
   useEffect(() => {
     if (stompClient && connected && currentRoomId) {
       subscribeToRoom(stompClient, currentRoomId);
@@ -99,14 +78,13 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // --- Handlers ---
-
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
   };
 
   const handleRoomChange = (roomId?: number) => {
     setCurrentRoomId(roomId);
+    setPage(0); // Reset page on room change
   };
 
   const handleLogout = () => {
@@ -114,20 +92,15 @@ const Dashboard: React.FC = () => {
     window.location.reload();
   };
 
-  // Tag Handlers for ThoughtForm
   const handleDeleteTag = (tag: string) => {
     setAvailableTags(prev => prev.filter(t => t !== tag));
   };
 
-  // --- Render ---
-
   return (
     <div className="dashboard-container">
-      {/* Header */}
       <header className="dashboard-header">
         <div className="header-left">
           <h1>ThoughtWall</h1>
-          {/* Fixed Props: activeRoomId, onRoomSelect */}
           <RoomManager 
             activeRoomId={currentRoomId} 
             onRoomSelect={handleRoomChange} 
@@ -135,38 +108,43 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="header-right">
           <div className="view-toggles">
-            <button 
-              className={viewMode === 'list' ? 'active' : ''} 
-              onClick={() => setViewMode('list')}
-            >
-              List
-            </button>
-            <button 
-              className={viewMode === 'kanban' ? 'active' : ''} 
-              onClick={() => setViewMode('kanban')}
-            >
-              Kanban
-            </button>
+            <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>List</button>
+            <button className={viewMode === 'kanban' ? 'active' : ''} onClick={() => setViewMode('kanban')}>Kanban</button>
           </div>
-          
           <button onClick={handleLogout} className="logout-btn">Logout</button>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="dashboard-content">
-        {loading && <div className="loading-spinner">Loading thoughts...</div>}
+        {loading && <div className="loading-spinner">Loading...</div>}
         {error && <div className="error-message">{error}</div>}
 
         <div className="action-bar">
-          <button className="add-thought-btn" onClick={() => setIsFormOpen(true)}>
-            + New Thought
-          </button>
+          <button className="add-thought-btn" onClick={() => setIsFormOpen(true)}>+ New Thought</button>
           <div className="connection-status">
-            Status: <span className={connected ? 'status-ok' : 'status-err'}>
-              {connected ? 'Connected' : 'Disconnected'}
-            </span>
+            Status: <span className={connected ? 'status-ok' : 'status-err'}>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
+        </div>
+
+        {/* --- PAGINATION CONTROLS --- */}
+        <div style={{display:'flex', justifyContent:'center', gap:'1rem', marginBottom:'1rem', alignItems:'center'}}>
+            <button 
+                className="tag-btn" 
+                disabled={page === 0} 
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                style={{opacity: page === 0 ? 0.5 : 1}}
+            >
+                ◀ Prev
+            </button>
+            <span style={{fontSize:'0.9rem', opacity:0.8}}>Page {page + 1} of {totalPages || 1}</span>
+            <button 
+                className="tag-btn" 
+                disabled={page >= totalPages - 1} 
+                onClick={() => setPage(p => p + 1)}
+                style={{opacity: page >= totalPages - 1 ? 0.5 : 1}}
+            >
+                Next ▶
+            </button>
         </div>
 
         {viewMode === 'list' ? (
@@ -178,33 +156,26 @@ const Dashboard: React.FC = () => {
             onPin={togglePin}
             onEdit={editThought}
             onAssign={assignUser}
-            // roomMembers={[]} // You can pass real members here if you fetch them
           />
         ) : (
           <KanbanBoard
             thoughts={thoughts}
             availableTags={availableTags}
             onUpdateThought={updateThought}
-            // roomMembers={[]} 
           />
         )}
       </main>
 
-      {/* Modal */}
       {isFormOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content" style={{maxWidth:'800px'}}>
             <ThoughtForm
-              // Fixed Props: onAdd, availableTags, etc.
               onAdd={async (content, tag, dueDate) => {
                 const success = await addThought(content, tag, dueDate);
                 if (success) {
                   setIsFormOpen(false);
                   showToast('Thought created!', 'success');
-                  // Add tag to local list if it's new
-                  if (!availableTags.includes(tag)) {
-                    setAvailableTags(prev => [...prev, tag]);
-                  }
+                  if (!availableTags.includes(tag)) setAvailableTags(prev => [...prev, tag]);
                 }
                 return success;
               }}
@@ -212,34 +183,13 @@ const Dashboard: React.FC = () => {
               defaultTags={defaultTags}
               onDeleteTag={handleDeleteTag}
             />
-            <button 
-              className="tag-btn" 
-              style={{marginTop: '10px'}} 
-              onClick={() => setIsFormOpen(false)}
-            >
-              Cancel
-            </button>
+            <button className="tag-btn" style={{marginTop: '10px'}} onClick={() => setIsFormOpen(false)}>Close</button>
           </div>
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toast && (
-        <Toast 
-          message={toast.message} 
-          type={toast.type} 
-          onClose={() => setToast(null)} // Fixed: Added onClose
-        />
-      )}
-
-      {/* Chat Widget */}
-      {currentRoomId && (
-        <ChatWidget 
-          roomId={currentRoomId.toString()} // Convert number to string for ChatWidget
-          stompClient={stompClient} 
-          connected={connected} 
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {currentRoomId && <ChatWidget roomId={currentRoomId.toString()} stompClient={stompClient} connected={connected} />}
     </div>
   );
 };
