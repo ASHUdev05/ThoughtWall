@@ -1,0 +1,70 @@
+services:
+  # 1. Database Service (Same as Prod)
+  db:
+    image: mysql:8.0
+    container_name: thought_wall_db_dev
+    environment:
+      MYSQL_ROOT_PASSWORD: 2005
+      MYSQL_DATABASE: thought_wall_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data_dev:/var/lib/mysql
+    networks:
+      - thoughtwall-net
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # 2. Backend Service (Dev Mode)
+  backend:
+    # Use the raw JDK image instead of building the Dockerfile
+    image: eclipse-temurin:25-jdk
+    container_name: thought_wall_backend_dev
+    working_dir: /app
+    volumes:
+      # Sync your local server folder to the container
+      - ./server/thought_wall:/app
+      # Mount local Maven cache to speed up builds (optional but recommended)
+      - ~/.m2:/root/.m2
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/thought_wall_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 2005
+      # Point to the container port where Vite is running
+      APP_FRONTEND_URL: http://localhost:5173
+    # Run Spring Boot in development mode
+    command: ./mvnw spring-boot:run
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - thoughtwall-net
+
+  # 3. Frontend Service (Dev Mode)
+  frontend:
+    # Use the raw Node image
+    image: node:20-alpine
+    container_name: thought_wall_frontend_dev
+    working_dir: /app
+    volumes:
+      # Sync your local client folder to the container
+      - ./client:/app
+      # Important: Keep node_modules inside the container separate from your host
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    # Run the Vite dev server with --host to expose it to the network
+    command: npm run dev -- --host
+    networks:
+      - thoughtwall-net
+
+networks:
+  thoughtwall-net:
+    driver: bridge
+
+volumes:
+  db_data_dev:
